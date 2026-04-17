@@ -56,7 +56,7 @@ echo "All nodes launched."
 echo "Press Ctrl+C to terminate all nodes."
 
 # Trap SIGINT to kill all child processes gracefully
-trap "echo 'Terminating all nodes...'; kill $LOGIC_PID $LED_PID $HAPTIC_PID $ANGLER_PID $SERIAL_PID" SIGINT
+trap "echo 'Terminating all nodes...'; kill \$(jobs -p) 2>/dev/null" SIGINT
 
 # Wait for all background processes
 wait
