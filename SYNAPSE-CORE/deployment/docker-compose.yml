@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  redis-broker:
+    image: redis:alpine
+    container_name: synapse_redis_broker
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - synapse_redis_data:/data
+
+volumes:
+  synapse_redis_data:
