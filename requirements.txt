@@ -1,0 +1,4 @@
+# Dependencies for Snake Game
+# The curses module is part of the standard Python library on Unix/Linux/macOS systems.
+# If running on Windows, you must install windows-curses to avoid module import failures.
+windows-curses; sys_platform == 'win32'
