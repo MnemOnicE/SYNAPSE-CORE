@@ -1,0 +1,31 @@
+name: PR Description and Compliance Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-pr-description:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for required sections in PR description
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const body = context.payload.pull_request.body;
+            if (!body) {
+              core.setFailed("PR description is empty! Please use the PR template.");
+              return;
+            }
+
+            const requiredSections = [
+              "## Node Archetype",
+              "## Payload Schema Additions",
+              "## Checklist"
+            ];
+
+            for (const section of requiredSections) {
+              if (!body.includes(section)) {
+                core.setFailed(`PR description is missing required section: ${section}`);
+              }
+            }
