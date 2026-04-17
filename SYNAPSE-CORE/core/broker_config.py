@@ -17,7 +17,12 @@ def get_redis_client() -> redis.Redis:
     load_dotenv(dotenv_path=env_path)
 
     host = os.getenv("REDIS_HOST", "localhost")
-    port = int(os.getenv("REDIS_PORT", 6379))
+    try:
+        port = int(os.getenv("REDIS_PORT", 6379))
+    except (ValueError, TypeError):
+        logger.error("Invalid REDIS_PORT value. Defaulting to 6379.")
+        port = 6379
+
     password = os.getenv("REDIS_PASSWORD")
 
     if not password:

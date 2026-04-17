@@ -9,7 +9,7 @@ echo "Starting Project SYNAPSE..."
 if [ ! -f .env ]; then
     echo "Error: .env file not found. Please ensure it exists."
     # Using return instead of exit for safe shell environments
-    exit 1
+    return 1
 fi
 
 # Ensure python environment exists
@@ -56,7 +56,7 @@ echo "All nodes launched."
 echo "Press Ctrl+C to terminate all nodes."
 
 # Trap SIGINT to kill all child processes gracefully
-trap "echo 'Terminating all nodes...'; kill \$(jobs -p) 2>/dev/null" SIGINT
+trap "echo 'Terminating all nodes...'; kill $LOGIC_PID $LED_PID $HAPTIC_PID $ANGLER_PID $SERIAL_PID" SIGINT
 
 # Wait for all background processes
 wait

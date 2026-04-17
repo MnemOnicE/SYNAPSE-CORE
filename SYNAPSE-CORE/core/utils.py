@@ -56,7 +56,4 @@ class PayloadManager:
     @staticmethod
     def decode_bytes(encoded_str: str) -> bytes:
         """Decodes base64 string back to raw bytes."""
-        try:
-            return base64.b64decode(encoded_str)
-        except Exception:
-            return b""
+        return base64.b64decode(encoded_str)
