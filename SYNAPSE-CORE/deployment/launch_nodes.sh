@@ -9,7 +9,7 @@ echo "Starting Project SYNAPSE..."
 if [ ! -f .env ]; then
     echo "Error: .env file not found. Please ensure it exists."
     # Using return instead of exit for safe shell environments
-    return 1
+    exit 1
 fi
 
 # Ensure python environment exists
