@@ -7,9 +7,7 @@ echo "Starting Project SYNAPSE..."
 
 # Check for .env file
 if [ ! -f .env ]; then
-    echo "Error: .env file not found. Please ensure it exists."
-    # Using return instead of exit for safe shell environments
-    exit 1
+    echo "Warning: .env file not found. Falling back to defaults."
 fi
 
 # Ensure python environment exists
@@ -36,20 +34,23 @@ sleep 2
 
 echo "Launching Synapse Nodes..."
 
+# Export PYTHONPATH to allow absolute imports within the 'src' directory
+export PYTHONPATH=src
+
 # Launch Hybrid Nodes (The Brain)
-python nodes/hybrids/logic_router.py &
+python -m synapse.nodes.hybrids.logic_router &
 LOGIC_PID=$!
 
 # Launch Subscriber Nodes (Motor/UI)
-python nodes/subscribers/desk_led_flasher.py &
+python -m synapse.nodes.subscribers.desk_led_flasher &
 LED_PID=$!
-python nodes/subscribers/termux_haptic_engine.py &
+python -m synapse.nodes.subscribers.termux_haptic_engine &
 HAPTIC_PID=$!
 
 # Launch Publisher Nodes (Sensors)
-python nodes/publishers/angler_watchdog.py &
+python -m synapse.nodes.publishers.angler_watchdog &
 ANGLER_PID=$!
-python nodes/publishers/serial_listener.py &
+python -m synapse.nodes.publishers.serial_listener &
 SERIAL_PID=$!
 
 echo "All nodes launched."

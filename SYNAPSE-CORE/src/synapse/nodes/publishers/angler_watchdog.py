@@ -12,17 +12,11 @@ sibling_concepts: ["Coding Squad", "KnoNav", "Credon Protocol"]
 """
 
 import time
-import sys
-import os
 
-# Add the root directory to path to allow importing 'core'
-sys.path.append(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
 
-from core.broker_config import get_redis_client
-from core.utils import PayloadManager
-from core.logger import get_logger
+from synapse.core.broker_config import get_redis_client
+from synapse.core.utils import PayloadManager
+from synapse.core.logger import get_logger
 
 logger = get_logger("angler_watchdog")
 

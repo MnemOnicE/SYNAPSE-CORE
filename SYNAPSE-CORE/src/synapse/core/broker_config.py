@@ -1,3 +1,16 @@
+"""
+---
+aliases: [Project SYNAPSE, The Living Blade, Axion Core]
+tags:
+  - #state/crystallized
+  - #process/as-within-so-throughout
+  - #architecture/distributed
+parent_concept: "Cybernetic Frameworks"
+child_concepts: ["Watchdog Node", "Transducer Node", "Observer Node", "Message Bus"]
+sibling_concepts: ["Coding Squad", "KnoNav", "Credon Protocol"]
+---
+"""
+
 import os
 import redis
 from dotenv import load_dotenv
@@ -13,7 +26,7 @@ def get_redis_client() -> redis.Redis:
     Pulls credentials from the environment variables (.env).
     """
     # Load .env file from the root directory of the project
-    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".env")
     load_dotenv(dotenv_path=env_path)
 
     host = os.getenv("REDIS_HOST", "localhost")
