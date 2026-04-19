@@ -26,7 +26,7 @@ def get_redis_client() -> redis.Redis:
     Pulls credentials from the environment variables (.env).
     """
     # Load .env file from the root directory of the project
-    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".env")
+    env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.env"))
     load_dotenv(dotenv_path=env_path)
 
     host = os.getenv("REDIS_HOST", "localhost")
