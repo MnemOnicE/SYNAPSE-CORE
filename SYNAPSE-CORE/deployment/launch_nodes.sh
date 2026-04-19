@@ -7,7 +7,7 @@ echo "Starting Project SYNAPSE..."
 
 # Check for .env file
 if [ ! -f .env ]; then
-    echo "Warning: .env file not found. Falling back to defaults."
+    echo "Warning: .env file not found. Falling back to defaults. Consider copying .env.example to .env"
 fi
 
 # Ensure python environment exists
