@@ -61,9 +61,9 @@ impl MmapRingBuffer {
 
         // Ensure there is space (simplistic check for this scaffold)
         let space_available = if *head >= *tail {
-            self.capacity - (*head - *tail)
+            self.capacity - (*head - *tail) - 1
         } else {
-            *tail - *head
+            *tail - *head - 1
         };
 
         if data.len() > space_available {
