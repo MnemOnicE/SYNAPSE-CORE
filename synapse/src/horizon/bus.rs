@@ -39,7 +39,7 @@ impl HorizonBus {
 
         if dt > 0.05 {
             // Evaluate every 50ms
-            let dq = (self.queue_depth as isize - self.last_queue_depth as isize) as f32;
+            let dq = self.queue_depth as f32 - self.last_queue_depth as f32;
             let dq_dt = dq / dt;
 
             // Read Python agent's processing rate from shared memory telemetry
