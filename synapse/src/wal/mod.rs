@@ -21,8 +21,8 @@ pub enum WalError {
 pub struct MmapRingBuffer {
     mmap: MmapMut,
     capacity: usize,
-    head: Mutex<usize>,
-    tail: Mutex<usize>,
+    head: usize,
+    tail: usize,
 }
 
 impl MmapRingBuffer {
