@@ -56,9 +56,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 4. Bind UDS Listener (Zero-Hop Ingress)
     // In a real Termux deployment, this would be `~/.synapse/ingress.sock`
-    let socket_path = "/tmp/synapse_ingress.sock";
+    let socket_path = "/data/data/com.termux/files/home/.synapse/ingress.sock";
     let _ = std::fs::remove_file(socket_path);
+
     let listener = UnixListener::bind(socket_path)?;
+    // Enforce The Permissions Law: 0600
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(socket_path, std::fs::Permissions::from_mode(0o600))?;
+    }
     println!("Listening on UDS: {}", socket_path);
 
     // Main UDS Acceptance Loop
