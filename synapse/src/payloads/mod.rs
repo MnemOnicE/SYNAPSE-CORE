@@ -50,7 +50,12 @@ impl Foldable for LidarPointCloud {
         let mut min_z = f32::MAX;
         let mut max_z = f32::MIN;
 
+        let mut valid_points = 0;
         for p in &self.points {
+            if !p.x.is_finite() || !p.y.is_finite() || !p.z.is_finite() {
+                continue;
+            }
+            valid_points += 1;
             if p.x < min_x {
                 min_x = p.x;
             }
@@ -78,7 +83,7 @@ impl Foldable for LidarPointCloud {
             max_y,
             min_z,
             max_z,
-            point_count: self.points.len(),
+            point_count: valid_points,
         };
 
         // Entropy loss is a rough heuristic: we lose individual point precision.

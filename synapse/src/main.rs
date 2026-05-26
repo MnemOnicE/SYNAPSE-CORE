@@ -10,20 +10,21 @@ use synapse::telemetry::AgentTelemetry;
 use synapse::wal::MmapRingBuffer;
 use tempfile::NamedTempFile;
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing Project SYNAPSE Horizon Engine...");
 
     // 1. Setup Backpressure Telemetry
     // In a real Termux deployment, this would be a known path in the private app dir.
-    let telemetry_file = NamedTempFile::new().expect("Failed to create temp telemetry file");
-    let mut telemetry_writer = AgentTelemetry::new(telemetry_file.path()).unwrap();
-    let telemetry_reader = Arc::new(AgentTelemetry::new(telemetry_file.path()).unwrap());
+    let telemetry_file = NamedTempFile::new()?;
+    let mut telemetry_writer = AgentTelemetry::new(telemetry_file.path())?;
+    let telemetry_reader = Arc::new(AgentTelemetry::new(telemetry_file.path())?);
 
     // 2. Setup the Mmap Ring Buffer (WAL)
-    let wal_file = NamedTempFile::new().expect("Failed to create temp WAL file");
-    let wal = Arc::new(Mutex::new(
-        MmapRingBuffer::new(wal_file.path(), 1024 * 1024).unwrap(),
-    ));
+    let wal_file = NamedTempFile::new()?;
+    let wal = Arc::new(Mutex::new(MmapRingBuffer::new(
+        wal_file.path(),
+        1024 * 1024,
+    )?));
 
     // 3. Initialize the Horizon Bus
     let mut bus = HorizonBus::new(telemetry_reader.clone(), wal.clone());
@@ -92,4 +93,5 @@ fn main() {
     bus.evaluate_horizon();
 
     println!("SYNAPSE Execution Complete.");
+    Ok(())
 }

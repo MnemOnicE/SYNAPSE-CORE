@@ -28,6 +28,11 @@ pub struct HolographicHeader<T> {
 
 impl<T> HolographicHeader<T> {
     pub fn new(payload: T, is_folded: bool, entropy_loss: f32) -> Self {
+        assert!(
+            entropy_loss.is_finite() && (0.0..=1.0).contains(&entropy_loss),
+            "invalid entropy_loss: {}",
+            entropy_loss
+        );
         Self {
             is_folded,
             entropy_loss,

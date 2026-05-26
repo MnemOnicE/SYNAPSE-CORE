@@ -26,7 +26,8 @@ impl AgentTelemetry {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
-            .create(true).truncate(false)
+            .create(true)
+            .truncate(false)
             .open(&path)?;
 
         // Ensure the file is at least 4 bytes large
@@ -43,6 +44,11 @@ impl AgentTelemetry {
     /// published by the Python agent in the Termux environment.
     /// The value is read atomically to avoid tearing.
     pub fn get_processing_rate(&self) -> u32 {
+        let ptr_addr = self.mmap.as_ptr() as usize;
+        assert!(
+            ptr_addr % std::mem::align_of::<AtomicU32>() == 0,
+            "mmap address is not aligned to AtomicU32"
+        );
         let ptr = self.mmap.as_ptr() as *const AtomicU32;
         let atomic_ref = unsafe { &*ptr };
         atomic_ref.load(Ordering::Acquire)
@@ -50,6 +56,11 @@ impl AgentTelemetry {
 
     /// Helper for testing to simulate Python agent writes
     pub fn set_processing_rate(&mut self, rate: u32) {
+        let ptr_addr = self.mmap.as_mut_ptr() as usize;
+        assert!(
+            ptr_addr % std::mem::align_of::<AtomicU32>() == 0,
+            "mmap address is not aligned to AtomicU32"
+        );
         let ptr = self.mmap.as_mut_ptr() as *mut AtomicU32;
         let atomic_ref = unsafe { &*ptr };
         atomic_ref.store(rate, Ordering::Release);
