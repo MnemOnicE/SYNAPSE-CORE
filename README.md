@@ -70,6 +70,8 @@ flowchart TD
         Router --> |Action Route| Sub1
         Router --> |Action Route| Sub2
     end
+
+    Egress -.-> |UDP Heartbeat| Telemetry
 ```
 
 
