@@ -1,6 +1,6 @@
 # Run the Rust binary in the background
-cargo run --manifest-path synapse/Cargo.toml &
-RUST_PID=$!
+cargo build --manifest-path synapse/Cargo.toml
+./synapse/target/debug/synapse &
 sleep 1
 
 # Run the python publisher
