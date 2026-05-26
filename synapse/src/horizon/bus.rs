@@ -12,7 +12,7 @@ pub enum BusState {
 
 pub struct HorizonBus {
     state: BusState,
-    telemetry: Arc<AgentTelemetry>,
+    pub telemetry: Arc<Mutex<AgentTelemetry>>,
     pub wal: Arc<Mutex<MmapRingBuffer>>,
     queue_depth: usize,
     last_check: Instant,
@@ -20,7 +20,7 @@ pub struct HorizonBus {
 }
 
 impl HorizonBus {
-    pub fn new(telemetry: Arc<AgentTelemetry>, wal: Arc<Mutex<MmapRingBuffer>>) -> Self {
+    pub fn new(telemetry: Arc<Mutex<AgentTelemetry>>, wal: Arc<Mutex<MmapRingBuffer>>) -> Self {
         Self {
             state: BusState::NormalFlow,
             telemetry,
@@ -42,8 +42,11 @@ impl HorizonBus {
             let dq = (self.queue_depth as isize - self.last_queue_depth as isize) as f32;
             let dq_dt = dq / dt;
 
-            // Read Python agent's processing rate from shared memory telemetry
-            let processing_rate = self.telemetry.get_processing_rate() as f32;
+            // Poll UDP and apply EMA/decay to get the latest processing rate
+            let processing_rate = {
+                let mut telemetry = self.telemetry.lock().unwrap();
+                telemetry.poll_and_decay()
+            };
 
             // The Schwarzschild limit logic
             if dq_dt > processing_rate {

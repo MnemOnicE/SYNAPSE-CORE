@@ -1,68 +1,80 @@
-use memmap2::{MmapMut, MmapOptions};
-use std::fs::OpenOptions;
-use std::io;
-use std::path::Path;
-use std::sync::atomic::{AtomicU32, Ordering};
-use thiserror::Error;
+use std::net::UdpSocket;
+use std::time::Instant;
 
-#[derive(Error, Debug)]
-pub enum TelemetryError {
-    #[error("Failed to open or create telemetry file: {0}")]
-    FileError(#[from] io::Error),
-    #[error("Failed to map telemetry file")]
-    MapError,
-}
-
-/// A shared memory telemetry interface to read the Python agent's
+/// A non-blocking UDP telemetry interface to read the Python agent's
 /// cycle completion rate to calculate dQ/dt for the event horizon.
 pub struct AgentTelemetry {
-    mmap: MmapMut,
+    socket: UdpSocket,
+    current_rate: f32,
+    last_heartbeat: Instant,
+    last_update: Instant,
 }
 
 impl AgentTelemetry {
-    /// Creates or opens a shared memory control file.
-    /// Expects a file size of at least 4 bytes (to hold a u32 for the rate).
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, TelemetryError> {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&path)?;
+    /// Binds a non-blocking UdpSocket listening on 127.0.0.1:9000
+    pub fn new() -> Result<Self, std::io::Error> {
+        let socket = UdpSocket::bind("127.0.0.1:9000")?;
+        socket.set_nonblocking(true)?;
 
-        // Ensure the file is at least 4 bytes large
-        if file.metadata()?.len() < 4 {
-            file.set_len(4)?;
+        let now = Instant::now();
+        Ok(Self {
+            socket,
+            current_rate: 0.1, // Floor value
+            last_heartbeat: now,
+            last_update: now,
+        })
+    }
+
+    /// Reads all pending UDP packets, updating the processing rate via EMA if a new
+    /// heartbeat is found. Applies exponential decay if the agent is silent for > 250ms.
+    pub fn poll_and_decay(&mut self) -> f32 {
+        let mut buf = [0u8; 64]; // Small buffer for simple scalar strings
+        let mut latest_heartrate: Option<f32> = None;
+
+        // Drain the socket buffer
+        loop {
+            match self.socket.recv_from(&mut buf) {
+                Ok((amt, _src)) => {
+                    if let Ok(msg) = std::str::from_utf8(&buf[..amt]) {
+                        if let Ok(val) = msg.trim().parse::<f32>() {
+                            latest_heartrate = Some(val);
+                        }
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    break;
+                }
+                Err(_) => {
+                    // Ignore other socket errors for resilience
+                    break;
+                }
+            }
         }
 
-        let mmap = unsafe { MmapOptions::new().map_mut(&file)? };
+        let now = Instant::now();
 
-        Ok(Self { mmap })
-    }
+        if let Some(rate) = latest_heartrate {
+            // New data arrived, apply EMA for recovery to prevent whiplash
+            self.current_rate = (rate * 0.2) + (self.current_rate * 0.8);
+            if self.current_rate < 0.1 {
+                self.current_rate = 0.1;
+            }
+            self.last_heartbeat = now;
+            self.last_update = now;
+        } else {
+            // No new data. Check for decay
+            let elapsed_since_heartbeat = now.duration_since(self.last_heartbeat).as_millis();
+            if elapsed_since_heartbeat > 250 {
+                let elapsed_since_update = now.duration_since(self.last_update).as_secs_f32();
+                let decay_factor = f32::powf(0.9, elapsed_since_update / 0.05);
+                self.current_rate *= decay_factor;
+                if self.current_rate < 0.1 {
+                    self.current_rate = 0.1;
+                }
+            }
+            self.last_update = now;
+        }
 
-    /// Reads the real-time processing rate (e.g., cycles per second or moving average)
-    /// published by the Python agent in the Termux environment.
-    /// The value is read atomically to avoid tearing.
-    pub fn get_processing_rate(&self) -> u32 {
-        let ptr_addr = self.mmap.as_ptr() as usize;
-        assert!(
-            ptr_addr % std::mem::align_of::<AtomicU32>() == 0,
-            "mmap address is not aligned to AtomicU32"
-        );
-        let ptr = self.mmap.as_ptr() as *const AtomicU32;
-        let atomic_ref = unsafe { &*ptr };
-        atomic_ref.load(Ordering::Acquire)
-    }
-
-    /// Helper for testing to simulate Python agent writes
-    pub fn set_processing_rate(&mut self, rate: u32) {
-        let ptr_addr = self.mmap.as_mut_ptr() as usize;
-        assert!(
-            ptr_addr % std::mem::align_of::<AtomicU32>() == 0,
-            "mmap address is not aligned to AtomicU32"
-        );
-        let ptr = self.mmap.as_mut_ptr() as *mut AtomicU32;
-        let atomic_ref = unsafe { &*ptr };
-        atomic_ref.store(rate, Ordering::Release);
+        self.current_rate
     }
 }

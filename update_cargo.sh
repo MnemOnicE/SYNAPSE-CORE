@@ -1,0 +1,1 @@
+sed -i 's/serde = { version = "1.0.228", features = \["derive"\] }/serde = { version = "1.0.228", features = ["derive"] }\nserde_json = { version = "1.0.138", features = ["raw_value"] }\nbytes = "1.5"/g' synapse/Cargo.toml
