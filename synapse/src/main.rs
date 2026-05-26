@@ -1,23 +1,28 @@
+use bytes::BytesMut;
+use serde::Deserialize;
+use std::io::Read;
+use std::os::unix::net::UnixListener;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use synapse::horizon::{
-    Foldable, HolographicHeader,
-    bus::{BusState, HorizonBus},
-};
-use synapse::payloads::{LidarPoint, LidarPointCloud};
+use synapse::horizon::bus::HorizonBus;
 use synapse::telemetry::AgentTelemetry;
 use synapse::wal::MmapRingBuffer;
 use tempfile::NamedTempFile;
 
+#[allow(dead_code)]
+#[derive(Deserialize)]
+struct PeekingHeader<'a> {
+    event_category: &'a str,
+    #[serde(borrow)]
+    data: &'a serde_json::value::RawValue,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing Project SYNAPSE Horizon Engine...");
 
-    // 1. Setup Backpressure Telemetry
-    // In a real Termux deployment, this would be a known path in the private app dir.
-    let telemetry_file = NamedTempFile::new()?;
-    let mut telemetry_writer = AgentTelemetry::new(telemetry_file.path())?;
-    let telemetry_reader = Arc::new(AgentTelemetry::new(telemetry_file.path())?);
+    // 1. Setup Non-Blocking UDP Telemetry
+    let telemetry = Arc::new(Mutex::new(AgentTelemetry::new()?));
 
     // 2. Setup the Mmap Ring Buffer (WAL)
     let wal_file = NamedTempFile::new()?;
@@ -27,71 +32,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?));
 
     // 3. Initialize the Horizon Bus
-    let mut bus = HorizonBus::new(telemetry_reader.clone(), wal.clone());
+    let bus = Arc::new(Mutex::new(HorizonBus::new(telemetry.clone(), wal.clone())));
 
-    // 4. Simulate the system load and Horizon crossing
-    println!("Simulating low load (Bulk spacetime)...");
+    // Simulate Python agent heartbeats via UDP
+    thread::spawn(|| {
+        let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        loop {
+            // Heartbeat indicating 150 cycles/sec
+            let _ = socket.send_to(b"150.0", "127.0.0.1:9000");
+            thread::sleep(Duration::from_millis(50));
+        }
+    });
 
-    // Simulate Python agent processing 100 packets/sec
-    telemetry_writer.set_processing_rate(100);
+    // Simulated background bus evaluation loop
+    let bus_eval = bus.clone();
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_millis(50));
+            let mut bus = bus_eval.lock().unwrap();
+            bus.evaluate_horizon();
+        }
+    });
 
-    for _ in 0..5 {
-        bus.increment_queue();
+    // 4. Bind UDS Listener (Zero-Hop Ingress)
+    // In a real Termux deployment, this would be `~/.synapse/ingress.sock`
+    let socket_path = "/tmp/synapse_ingress.sock";
+    let _ = std::fs::remove_file(socket_path);
+    let listener = UnixListener::bind(socket_path)?;
+    println!("Listening on UDS: {}", socket_path);
+
+    // Main UDS Acceptance Loop
+    for stream in listener.incoming() {
+        match stream {
+            Ok(mut stream) => {
+                let bus_clone = bus.clone();
+                let wal_clone = wal.clone();
+
+                thread::spawn(move || {
+                    let mut buf = vec![0; 4096];
+                    if let Ok(size) = stream.read(&mut buf) {
+                        let mut bytes_mut = BytesMut::new();
+                        bytes_mut.extend_from_slice(&buf[..size]);
+                        let bytes = bytes_mut.freeze();
+
+                        // Parse header with zero-copy
+                        if let Ok(header) = serde_json::from_slice::<PeekingHeader>(&bytes) {
+                            println!("Routed Event Category: {}", header.event_category);
+
+                            // Send full raw payload to WAL
+                            if let Ok(wal) = wal_clone.lock() {
+                                let _ = wal.write_raw(&bytes);
+                            }
+
+                            // Increment queue depth
+                            if let Ok(mut bus) = bus_clone.lock() {
+                                bus.increment_queue();
+                            }
+                        }
+                    }
+                });
+            }
+            Err(err) => {
+                eprintln!("UDS Error: {}", err);
+                break;
+            }
+        }
     }
 
-    thread::sleep(Duration::from_millis(60));
-    bus.evaluate_horizon();
-
-    println!("Simulating load spike (Event Horizon)...");
-
-    for _ in 0..20 {
-        bus.increment_queue(); // dQ/dt will be high
-    }
-
-    thread::sleep(Duration::from_millis(60));
-    bus.evaluate_horizon();
-
-    if bus.current_state() == BusState::Folded {
-        println!("Bus is folded. Creating Holographic Header for a massive LiDAR point cloud.");
-
-        let cloud = LidarPointCloud {
-            points: vec![
-                LidarPoint {
-                    x: 0.1,
-                    y: 0.2,
-                    z: 0.3,
-                },
-                LidarPoint {
-                    x: 10.1,
-                    y: 5.2,
-                    z: -1.3,
-                },
-                LidarPoint {
-                    x: -2.1,
-                    y: 3.2,
-                    z: 7.3,
-                },
-            ],
-        };
-
-        let (folded_payload, entropy) = cloud.fold();
-        let header = HolographicHeader::new(folded_payload, true, entropy);
-
-        println!("Generated Header: {:?}", header);
-
-        // Simulating the TTL check
-        let is_fresh = bus.should_unfold(&header, 500); // Max age 500ms
-        println!("Is frame fresh enough to unfold? {}", is_fresh);
-    }
-
-    println!("Simulating recovery...");
-    bus.decrement_queue();
-    bus.decrement_queue();
-    bus.decrement_queue();
-
-    thread::sleep(Duration::from_millis(60));
-    bus.evaluate_horizon();
-
-    println!("SYNAPSE Execution Complete.");
     Ok(())
 }
