@@ -69,9 +69,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let wal_clone = wal.clone();
 
                 thread::spawn(move || {
-                    let mut buf = Vec::new();
-                    if let Ok(_) = stream.read_to_end(&mut buf) {
-                        let bytes = bytes::Bytes::from(buf);
+                    let mut buf = vec![0; 4096];
+                    if let Ok(size) = stream.read(&mut buf) {
+                        let mut bytes_mut = BytesMut::new();
+                        bytes_mut.extend_from_slice(&buf[..size]);
+                        let bytes = bytes_mut.freeze();
 
                         // Parse header with zero-copy
                         if let Ok(header) = serde_json::from_slice::<PeekingHeader>(&bytes) {

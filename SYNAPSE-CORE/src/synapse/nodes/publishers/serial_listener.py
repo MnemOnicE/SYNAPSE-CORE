@@ -49,10 +49,12 @@ def main():
         }
 
         try:
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
-                client.connect(socket_path)
-                serialized = json.dumps(payload_dict)
-                client.sendall(serialized.encode('utf-8'))
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            client.connect(socket_path)
+
+            serialized = json.dumps(payload_dict)
+            client.sendall(serialized.encode('utf-8'))
+            client.close()
             logger.info(f"Published hardware event to UDS bus: {payload_dict['event_category']}")
 
         except Exception as e:

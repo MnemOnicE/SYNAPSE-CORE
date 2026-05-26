@@ -7,6 +7,7 @@ pub struct AgentTelemetry {
     socket: UdpSocket,
     current_rate: f32,
     last_heartbeat: Instant,
+    last_update: Instant,
 }
 
 impl AgentTelemetry {
@@ -15,10 +16,12 @@ impl AgentTelemetry {
         let socket = UdpSocket::bind("127.0.0.1:9000")?;
         socket.set_nonblocking(true)?;
 
+        let now = Instant::now();
         Ok(Self {
             socket,
             current_rate: 0.1, // Floor value
-            last_heartbeat: Instant::now(),
+            last_heartbeat: now,
+            last_update: now,
         })
     }
 
@@ -57,15 +60,19 @@ impl AgentTelemetry {
                 self.current_rate = 0.1;
             }
             self.last_heartbeat = now;
+            self.last_update = now;
         } else {
             // No new data. Check for decay
-            if now.duration_since(self.last_heartbeat).as_millis() > 250 {
-                // Apply exponential decay: decay by 10% per cycle.
-                self.current_rate *= 0.9;
+            let elapsed_since_heartbeat = now.duration_since(self.last_heartbeat).as_millis();
+            if elapsed_since_heartbeat > 250 {
+                let elapsed_since_update = now.duration_since(self.last_update).as_secs_f32();
+                let decay_factor = f32::powf(0.9, elapsed_since_update / 0.05);
+                self.current_rate *= decay_factor;
                 if self.current_rate < 0.1 {
                     self.current_rate = 0.1;
                 }
             }
+            self.last_update = now;
         }
 
         self.current_rate
