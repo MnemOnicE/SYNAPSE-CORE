@@ -14,6 +14,7 @@ sibling_concepts: ["Coding Squad", "KnoNav", "Credon Protocol"]
 import time
 import socket
 import json
+import os
 
 from synapse.core.utils import PayloadManager
 from synapse.core.logger import get_logger
@@ -26,7 +27,7 @@ def main():
         "Serial Listener initialized. Simulating serial port reads with binary payloads..."
     )
 
-    socket_path = "/tmp/synapse_ingress.sock"
+    socket_path = os.path.expanduser("~/.synapse/ingress.sock")
 
     # Simulate an observation loop
     for i in range(3):
