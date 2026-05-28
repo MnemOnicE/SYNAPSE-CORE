@@ -20,6 +20,14 @@ from typing import Any, Dict, Optional
 class PayloadManager:
     """Handles parsing, building, and verifying the standardized Synapse JSON schema."""
 
+    REQUIRED_KEYS = frozenset({
+        "timestamp",
+        "source_node",
+        "event_category",
+        "action_intent",
+        "data",
+    })
+
     @staticmethod
     def build_payload(
         source_node: str, event_category: str, action_intent: str, data: Dict[str, Any]
@@ -45,15 +53,8 @@ class PayloadManager:
         """
         try:
             payload = json.loads(raw_message)
-            required_keys = {
-                "timestamp",
-                "source_node",
-                "event_category",
-                "action_intent",
-                "data",
-            }
 
-            if not required_keys.issubset(payload.keys()):
+            if not isinstance(payload, dict) or not PayloadManager.REQUIRED_KEYS.issubset(payload.keys()):
                 raise ValueError("Missing required keys in payload schema.")
 
             return payload
