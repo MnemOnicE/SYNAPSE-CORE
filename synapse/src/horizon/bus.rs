@@ -116,3 +116,83 @@ impl HorizonBus {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::horizon::HolographicHeader;
+    use chrono::{Duration, Utc};
+    use std::sync::OnceLock;
+
+    static BUS: OnceLock<HorizonBus> = OnceLock::new();
+
+    fn get_bus() -> &'static HorizonBus {
+        BUS.get_or_init(|| {
+            // Use dummy implementations or minimal setups for testing should_unfold
+            // Since AgentTelemetry binds to a port, we'll try to let it bind, but since
+            // should_unfold does not touch telemetry or wal, we just need ANY valid instance.
+            // If AgentTelemetry::new() fails (e.g., port in use), we'll panic, but it's
+            // safe for isolated test runs.
+            let telemetry = Arc::new(Mutex::new(
+                AgentTelemetry::new().expect("Failed to initialize AgentTelemetry for test bus")
+            ));
+
+            let temp_dir = tempfile::tempdir().expect("Failed to create temp dir for test bus WAL");
+            let wal_path = temp_dir.path().join("test_wal.bin");
+            let wal = Arc::new(Mutex::new(
+                MmapRingBuffer::new(&wal_path, 1024).expect("Failed to initialize WAL for test bus")
+            ));
+
+            HorizonBus::new(telemetry, wal)
+        })
+    }
+
+    #[test]
+    fn test_should_unfold_fresh_frame() {
+        let bus = get_bus();
+        let mut header = HolographicHeader::new((), true, 0.5);
+        // Set timestamp to 50ms ago
+        header.timestamp = Utc::now() - Duration::try_milliseconds(50).unwrap();
+
+        // Max age is 100ms, 50ms is fresh
+        assert!(bus.should_unfold(&header, 100));
+    }
+
+    #[test]
+    fn test_should_unfold_stale_frame() {
+        let bus = get_bus();
+        let mut header = HolographicHeader::new((), true, 0.5);
+        // Set timestamp to 150ms ago
+        header.timestamp = Utc::now() - Duration::try_milliseconds(150).unwrap();
+
+        // Max age is 100ms, 150ms is stale
+        assert!(!bus.should_unfold(&header, 100));
+    }
+
+    #[test]
+    fn test_should_unfold_future_frame() {
+        let bus = get_bus();
+        let mut header = HolographicHeader::new((), true, 0.5);
+        // Set timestamp to 50ms in the future
+        header.timestamp = Utc::now() + Duration::try_milliseconds(50).unwrap();
+
+        assert!(!bus.should_unfold(&header, 100));
+    }
+
+    #[test]
+    fn test_should_unfold_edge_cases() {
+        let bus = get_bus();
+
+        // Test exact 0 age (or very close to it)
+        let mut header = HolographicHeader::new((), true, 0.5);
+        header.timestamp = Utc::now();
+        assert!(bus.should_unfold(&header, 100));
+
+
+        // Max age threshold (testing exactly at boundary can be flaky due to execution time)
+        // so we test right before the boundary (e.g., 90ms for a 100ms max age)
+        let mut near_boundary_header = HolographicHeader::new((), true, 0.5);
+        near_boundary_header.timestamp = Utc::now() - Duration::try_milliseconds(90).unwrap();
+        assert!(bus.should_unfold(&near_boundary_header, 100));
+    }
+}
