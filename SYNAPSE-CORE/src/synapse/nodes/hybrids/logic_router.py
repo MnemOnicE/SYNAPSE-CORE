@@ -11,11 +11,11 @@ sibling_concepts: ["Coding Squad", "KnoNav", "Credon Protocol"]
 ---
 """
 
-
-
 from synapse.core.broker_config import get_redis_client
 from synapse.core.utils import PayloadManager
 from synapse.core.logger import get_logger
+
+VALID_HARDWARE_BUTTONS = {"panic_button_1"}
 
 logger = get_logger("logic_router")
 
@@ -47,7 +47,25 @@ def main():
 
             # Brain Logic: Listen to sensory events, decide what to do
             if payload.get("event_category") == "hardware_button_press":
-                button_id = payload.get("data", {}).get("button_id")
+                data = payload.get("data")
+                if not isinstance(data, dict):
+                    logger.warning(
+                        "Brain dropped hardware_button_press: 'data' field is missing or invalid type."
+                    )
+                    continue
+
+                button_id = data.get("button_id")
+                if not isinstance(button_id, str):
+                    logger.warning(
+                        "Brain dropped hardware_button_press: 'button_id' is missing or invalid type."
+                    )
+                    continue
+
+                if button_id not in VALID_HARDWARE_BUTTONS:
+                    logger.warning(
+                        "Brain dropped hardware_button_press: Unrecognized button_id."
+                    )
+                    continue
 
                 logger.info(f"Brain received button press: {button_id}")
 
