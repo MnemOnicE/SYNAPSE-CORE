@@ -37,7 +37,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bus = Arc::new(Mutex::new(HorizonBus::new(telemetry.clone(), wal.clone())));
 
     // Simulate Python agent heartbeats via UDP
-    let mock_target_addr = telemetry_addr.clone();
+    let mock_target_addr = if let Ok(addr) = telemetry_addr.parse::<std::net::SocketAddr>() {
+        if addr.ip().is_unspecified() {
+            let ip = if addr.is_ipv6() {
+                std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST)
+            } else {
+                std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)
+            };
+            std::net::SocketAddr::new(ip, addr.port()).to_string()
+        } else {
+            telemetry_addr.clone()
+        }
+    } else {
+        telemetry_addr.clone()
+    };
     thread::spawn(move || {
         let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
         loop {
