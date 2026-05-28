@@ -11,9 +11,9 @@ pub struct AgentTelemetry {
 }
 
 impl AgentTelemetry {
-    /// Binds a non-blocking UdpSocket listening on 127.0.0.1:9000
-    pub fn new() -> Result<Self, std::io::Error> {
-        let socket = UdpSocket::bind("127.0.0.1:9000")?;
+    /// Binds a non-blocking UdpSocket listening on the provided address
+    pub fn new(addr: &str) -> Result<Self, std::io::Error> {
+        let socket = UdpSocket::bind(addr)?;
         socket.set_nonblocking(true)?;
 
         let now = Instant::now();
