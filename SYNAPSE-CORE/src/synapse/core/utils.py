@@ -20,13 +20,13 @@ from typing import Any, Dict, Optional
 class PayloadManager:
     """Handles parsing, building, and verifying the standardized Synapse JSON schema."""
 
-    REQUIRED_KEYS = {
+    REQUIRED_KEYS = frozenset({
         "timestamp",
         "source_node",
         "event_category",
         "action_intent",
         "data",
-    }
+    })
 
     @staticmethod
     def build_payload(
