@@ -54,7 +54,7 @@ class PayloadManager:
         try:
             payload = json.loads(raw_message)
 
-            if not PayloadManager.REQUIRED_KEYS.issubset(payload.keys()):
+            if not isinstance(payload, dict) or not PayloadManager.REQUIRED_KEYS.issubset(payload.keys()):
                 raise ValueError("Missing required keys in payload schema.")
 
             return payload
