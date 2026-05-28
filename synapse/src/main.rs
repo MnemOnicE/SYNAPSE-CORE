@@ -21,8 +21,10 @@ struct PeekingHeader<'a> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing Project SYNAPSE Horizon Engine...");
 
+    let telemetry_addr = std::env::var("SYNAPSE_TELEMETRY_ADDR").unwrap_or_else(|_| "127.0.0.1:9000".to_string());
+
     // 1. Setup Non-Blocking UDP Telemetry
-    let telemetry = Arc::new(Mutex::new(AgentTelemetry::new()?));
+    let telemetry = Arc::new(Mutex::new(AgentTelemetry::new(&telemetry_addr)?));
 
     // 2. Setup the Mmap Ring Buffer (WAL)
     let wal_file = NamedTempFile::new()?;
@@ -35,11 +37,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bus = Arc::new(Mutex::new(HorizonBus::new(telemetry.clone(), wal.clone())));
 
     // Simulate Python agent heartbeats via UDP
-    thread::spawn(|| {
+    let mock_target_addr = telemetry_addr.clone();
+    thread::spawn(move || {
         let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
         loop {
             // Heartbeat indicating 150 cycles/sec
-            let _ = socket.send_to(b"150.0", "127.0.0.1:9000");
+            let _ = socket.send_to(b"150.0", mock_target_addr.as_str());
             thread::sleep(Duration::from_millis(50));
         }
     });
