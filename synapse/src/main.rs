@@ -37,6 +37,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bus = Arc::new(Mutex::new(HorizonBus::new(telemetry.clone(), wal.clone())));
 
     // Simulate Python agent heartbeats via UDP
+    thread::spawn(|| {
+        let mut bind_attempts = 0;
+        let socket = loop {
+            match std::net::UdpSocket::bind("127.0.0.1:0") {
+                Ok(s) => break s,
+                Err(e) => {
+                    bind_attempts += 1;
+                    eprintln!(
+                        "Warning: Failed to bind simulation UDP socket (attempt {}): {}",
+                        bind_attempts, e
+                    );
+                    if bind_attempts >= 5 {
+                        eprintln!(
+                            "Error: Simulation heartbeat thread terminating after 5 failed bind attempts."
+                        );
+                        return;
+                    }
+                    thread::sleep(Duration::from_secs(1));
+                }
+            }
+        };
+
+        loop {
+            // Heartbeat indicating 150 cycles/sec
+            if let Err(e) = socket.send_to(b"150.0", "127.0.0.1:9000") {
+                eprintln!("Warning: Failed to send simulated heartbeat: {}", e);
+            }
     let mock_target_addr = telemetry_addr.clone();
     thread::spawn(move || {
         let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
